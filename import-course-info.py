@@ -6,7 +6,7 @@ import time
 import datetime
 import config
 import csv
-import pysftp
+#import pysftp
 from smb.SMBConnection import SMBConnection
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,18 @@ def put_file_smb(_filename):
     finally:
         conn.close()
 
+'''
+# completely untested sftp file movement option
+def put_file_sftp(_filename):
+
+    try:
+        with pysftp.Connection(config.sftp_host, username=config.sftp_user, password=config.sftp_password) as sftp:
+            with sftp.cd(config.sftp_directory):  # temporarily chdir to public
+                sftp.put(_filename)  # upload file to public/ on remote
+    except Exception as e:
+        logger.exception("Error sftping file to server. " + str(e))
+'''
+
 if __name__ == '__main__':
 
     HTTPConnection.debuglevel = 1  
@@ -131,17 +143,6 @@ if __name__ == '__main__':
         except csv.Error as e:
             logger.exception("Error reading or writing courses file. " + str(e))
 
-    # now save file to share
+    # if we successfully generated the file, move it to its remote destination
     if file_success:
         put_file_smb(fname_out)
-
-    '''
-    # if we successfully generated a file, upload it to sftp location
-    if file_success: 
-        try:
-            with pysftp.Connection(config.sftp_host, username=config.sftp_user, password=config.sftp_password) as sftp:
-                with sftp.cd(config.sftp_directory):             # temporarily chdir to public
-                    sftp.put(fname_out)  # upload file to public/ on remote
-        except Exception as e:
-            logger.exception("Error sftping file to server. " + str(e))
-    '''
