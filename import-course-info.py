@@ -7,6 +7,7 @@ import datetime
 import config
 import csv
 import pysftp
+from smb.SMBConnection import SMBConnection
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s %(module)s %(levelname)s: %(message)s',
@@ -49,6 +50,33 @@ def call_coursescsv_export(_catalog_id):
 
     except Exception as e:
         logger.error("Error in call_coursescsv_export. " + str(e))
+
+def put_file_smb(_filename):
+
+    try:
+        # create samba connection
+        conn = SMBConnection(config.smb_username,config.smb_password,config.smb_localname,config.smb_remotename,'',use_ntlm_v2=True,
+                            sign_options=SMBConnection.SIGN_WHEN_SUPPORTED,
+                            is_direct_tcp=True)
+        connected = conn.connect(config.smb_remotename,445)
+
+        # save file to share location
+        try:
+            with open(_filename, 'rb') as fstore:
+                conn.storeFile(config.smb_sharename, config.smb_filename, fstore)
+
+            #Response = conn.listShares(timeout=30)  # obtain a list of shares
+            #print('Shares on: ' + config.smb_remotename)
+
+            #for i in range(len(Response)):  # iterate through the list of shares
+            #    print("  Share[",i,"] =", Response[i].name)
+
+        except Exception as e:
+            print(str(e))
+    except Exception as e:
+        print(str(e))
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
 
@@ -102,6 +130,9 @@ if __name__ == '__main__':
             file_success = True
         except csv.Error as e:
             logger.exception("Error reading or writing courses file. " + str(e))
+
+    # now save file to share
+    put_file_smb(fname_out)
 
     '''
     # if we successfully generated a file, upload it to sftp location

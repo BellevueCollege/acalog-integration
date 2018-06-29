@@ -13,3 +13,11 @@ sftp_host=''
 sftp_user=''
 sftp_password=''
 sftp_directory=''
+
+# smb/file share config
+smb_username=''
+smb_password=''
+smb_remotename=''
+smb_localname=''
+smb_sharename=''
+smb_filename=''
