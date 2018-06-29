@@ -72,9 +72,9 @@ def put_file_smb(_filename):
             #    print("  Share[",i,"] =", Response[i].name)
 
         except Exception as e:
-            print(str(e))
+            logger.exception("Error storing file on remote share. " + str(e))
     except Exception as e:
-        print(str(e))
+        logger.exception("Error establinshing samba connection. " + str(e))
     finally:
         conn.close()
 
