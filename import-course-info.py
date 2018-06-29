@@ -132,7 +132,8 @@ if __name__ == '__main__':
             logger.exception("Error reading or writing courses file. " + str(e))
 
     # now save file to share
-    put_file_smb(fname_out)
+    if file_success:
+        put_file_smb(fname_out)
 
     '''
     # if we successfully generated a file, upload it to sftp location
