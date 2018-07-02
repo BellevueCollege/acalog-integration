@@ -3,7 +3,6 @@ import urllib.request
 from http.client import HTTPConnection
 import xmltodict
 import time
-import datetime
 import config
 import csv
 #import pysftp
@@ -12,6 +11,41 @@ from smb.SMBConnection import SMBConnection
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s %(module)s %(levelname)s: %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO) #set logging format
+
+# use Acalog API to get ID of current published, non-archived catalog
+def get_current_catalog():
+
+    catalog_id = None
+
+    try:
+        catalog_xml = urllib.request.urlopen(config.acalog_ws_apiurl.format(config.acalog_ws_apikey))
+        #print(catalog_xml.headers.as_string())
+    
+        xmldict = xmltodict.parse(catalog_xml)
+
+        #parse returned xml for cat id
+        # catalog info may be OrderedDict or list, so process accordingly
+        if isinstance(xmldict['catalogs']['catalog'], dict):
+            catdict = dict(xmldict['catalogs']['catalog']) # use regular dict, not OrderedDict
+
+            state = catdict['state']
+            if state['published'] == 'Yes' and state['archived'] == 'No':
+                catalog_id = catdict['@id'].split('-')[-1]
+        else:
+            # list of dicts so process accordingly
+            catalogs_dict = xmldict['catalogs']['catalog']
+
+            for catdict in catalogs_dict:
+                #print(catdict)
+                state = catdict['state']
+                if state['published'] == 'Yes' and state['archived'] == 'No':
+
+                    catalog_id = catdict['@id'].split('-')[-1]
+                    break
+    except Exception as e:
+        logger.exception("Error retrieving correct catalog ID. " + str(e))
+    finally:
+        return catalog_id
 
 # this method remotely calls the Acalog Courses CSV service and saves the returned file
 def call_coursescsv_export(_catalog_id):
@@ -94,55 +128,37 @@ if __name__ == '__main__':
 
     HTTPConnection.debuglevel = 1  
 
-    # use Acalog API to get ID of current publish, non-archived catalog
-    catalog_xml = urllib.request.urlopen(config.acalog_ws_apiurl.format(config.acalog_ws_apikey))
-    #print(catalog_xml.headers.as_string())
-    xmldict = xmltodict.parse(catalog_xml)
-    catalog_id = 2  #default value
+    logger.info("Getting current catalog info.")
 
-    #parse returned xml for cat id
-    # catalog info may be OrderedDict or list, so process accordingly
-    if isinstance(xmldict['catalogs']['catalog'], dict):
-        catdict = dict(xmldict['catalogs']['catalog']) # use regular dict, not OrderedDict
-
-        state = catdict['state']
-        if state['published'] == 'Yes' and state['archived'] == 'No':
-            catalog_id = catdict['@id'].split('-')[-1]
-    else:
-        catalogs_dict = xmldict['catalogs']['catalog']
-
-        for catdict in catalogs_dict:
-            #print(catdict)
-            state = catdict['state']
-            if state['published'] == 'Yes' and state['archived'] == 'No':
-
-                catalog_id = catdict['@id'].split('-')[-1]
-                break
+    catalog_id = get_current_catalog()
     #print(catalog_id)
 
-    # now use the catalog ID to pull the courses CSV
-    #call_coursescsv_export(catalog_id)
-    call_coursescsv_export(2)
+    # only proceed if valid catalog ID
+    if catalog_id:
+    
+        logger.info("Found a valid catalog. Pulling courses CSV from Acalog remote service.")
+        # now use the catalog ID to pull the courses CSV
+        call_coursescsv_export(catalog_id)
+        #call_coursescsv_export(2)
 
-    # now that we have a full courses file, process it to just get the pieces we need
-    today = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    fname_in = 'courses.csv'
-    fname_out = "courses_{}.csv".format(today)
-    file_success = False
+        # now that we have a full courses file, process it to just get the pieces we need
+        fname_in = 'courses.csv'
+        fname_out = 'course_outcomes.csv'
+        file_success = False
 
-    with open(fname_in, 'r', encoding='utf8') as fin, open(fname_out, 'w') as fout:
-        reader = csv.DictReader(fin)
-        next(reader, None)  # skip the headers
-        writer = csv.writer(fout)
+        with open(fname_in, 'r', encoding='utf8') as fin, open(fname_out, 'w') as fout:
+            reader = csv.DictReader(fin)
+            next(reader, None)  # skip the headers
+            writer = csv.writer(fout)
 
-        try:
-            for row in reader:
-                writer.writerow( (row["Prefix"]+row["Common Course Identifier"],row["Code"],row["Catalog Name"],row["Course Outcomes"]) )
-            
-            file_success = True
-        except csv.Error as e:
-            logger.exception("Error reading or writing courses file. " + str(e))
+            try:
+                for row in reader:
+                    writer.writerow( (row["Prefix"]+row["Common Course Identifier"],row["Code"],row["Catalog Name"],row["Course Outcomes"]) )
+                
+                file_success = True
+            except csv.Error as e:
+                logger.exception("Error reading or writing courses file. " + str(e))
 
-    # if we successfully generated the file, move it to its remote destination
-    if file_success:
-        put_file_smb(fname_out)
+        # if we successfully generated the file, move it to its remote destination
+        if file_success:
+            put_file_smb(fname_out)
