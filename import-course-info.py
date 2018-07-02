@@ -5,6 +5,7 @@ import xmltodict
 import time
 import config
 import csv
+import os
 #import pysftp
 from smb.SMBConnection import SMBConnection
 
@@ -139,7 +140,6 @@ if __name__ == '__main__':
         logger.info("Found a valid catalog. Pulling courses CSV from Acalog remote service.")
         # now use the catalog ID to pull the courses CSV
         call_coursescsv_export(catalog_id)
-        #call_coursescsv_export(2)
 
         # now that we have a full courses file, process it to just get the pieces we need
         fname_in = 'courses.csv'
@@ -152,6 +152,7 @@ if __name__ == '__main__':
             writer = csv.writer(fout)
 
             try:
+                logger.info("File successfully pulled from Acalog remote service. Generate CSV file of outcomes.")
                 for row in reader:
                     writer.writerow( (row["Prefix"]+row["Common Course Identifier"],row["Code"],row["Catalog Name"],row["Course Outcomes"]) )
                 
@@ -160,5 +161,8 @@ if __name__ == '__main__':
                 logger.exception("Error reading or writing courses file. " + str(e))
 
         # if we successfully generated the file, move it to its remote destination
-        if file_success:
+        if file_success and os.path.getsize(fname_out) > 9000:
+            logger.info("Course outcomes file successfully generated so let's move it to the remote location.")
             put_file_smb(fname_out)
+        else:
+            logger.warn("Course outcomes file is empty, too small, or was not successfully generated. Not moving to remote location.")
