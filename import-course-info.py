@@ -6,6 +6,7 @@ import time
 import config
 import csv
 import os
+import html
 #import pysftp
 from smb.SMBConnection import SMBConnection
 
@@ -154,7 +155,7 @@ if __name__ == '__main__':
             try:
                 logger.info("File successfully pulled from Acalog remote service. Generate CSV file of outcomes.")
                 for row in reader:
-                    writer.writerow( (row["Prefix"]+row["Common Course Identifier"],row["Code"],row["Catalog Name"],row["Course Outcomes"]) )
+                    writer.writerow( (row["Prefix"]+html.unescape(row["Common Course Identifier"]),row["Code"],row["Catalog Name"],row["Course Outcomes"]) )
                 
                 file_success = True
             except csv.Error as e:
